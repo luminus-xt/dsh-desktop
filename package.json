@@ -1,29 +1,28 @@
 {
-  "name": "dsh-desktop-windows",
-  "productName": "DeepSeek Harness Desktop",
-  "version": "0.3.0",
-  "description": "DeepSeek Harness 桌面版（Windows）· Electron desktop shell for DeepSeek Harness — 双击即用 / double-click to run · 支持选区截图提问、系统托盘、会话管理 / region screenshot, system tray, session manager",
+  "name": "dsh-desktop-wsl",
+  "productName": "DeepSeek Harness (WSL)",
+  "version": "0.1.0",
+  "description": "WSL 适配版：Windows 桌面客户端，连接 WSL 中已有的 DeepSeek Harness Web UI。支持选区截图提问、系统托盘、会话管理。",
   "main": "src/main.js",
   "license": "MIT",
-  "author": "ReachGa0",
+  "author": "luminus-xt",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ReachGa0/dsh-desktop.git"
+    "url": "git+https://github.com/luminus-xt/dsh-desktop.git"
   },
   "keywords": [
     "deepseek",
     "deepseek-harness",
     "dsh",
-    "dsh-plugin",
     "electron",
     "desktop",
-    "windows"
+    "windows",
+    "wsl"
   ],
   "files": [
     "src",
     "assets",
     "README.md",
-    "README.en.md",
     "LICENSE"
   ],
   "engines": {
@@ -39,8 +38,8 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.dsh.desktop",
-    "productName": "DeepSeek Harness Desktop",
+    "appId": "com.dsh.desktop.wsl",
+    "productName": "DeepSeek Harness (WSL)",
     "directories": {
       "output": "release"
     },
@@ -53,14 +52,14 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "dsh-desktop-${version}-setup.${ext}",
+      "artifactName": "dsh-desktop-wsl-${version}-setup.${ext}",
       "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "DeepSeek Harness"
+      "shortcutName": "DeepSeek Harness (WSL)"
     }
   }
 }
