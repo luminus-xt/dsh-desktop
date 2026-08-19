@@ -59,7 +59,7 @@ function shotLog(...args) {
  * 自动更新检查
  * ------------------------------------------------------------------ */
 
-const REPO = 'ReachGa0/dsh-desktop'
+const REPO = 'luminus-xt/dsh-desktop'
 const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases/latest`
 const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`
 const UPDATE_CHECK_TIMEOUT_MS = 10_000
