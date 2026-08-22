@@ -40,6 +40,12 @@ let isQuitting = false
 let sessionsWin = null
 let shotWindow = null
 let pendingShot = null
+let appURL = '' // 应用主页面地址；更新进度页等临时页面结束后必须回到这里
+
+/** 回到应用主页面（不能用 reload()——它会把临时页如更新进度页再刷一遍，把人困住）。 */
+function loadApp() {
+  if (mainWindow && !mainWindow.isDestroyed() && appURL) mainWindow.loadURL(appURL).catch(() => {})
+}
 
 /* ------------------------------------------------------------------ *
  * 工具：日志
@@ -132,6 +138,9 @@ async function checkForUpdates() {
  * ------------------------------------------------------------------ */
 
 const DSH_NPM_PACKAGE = '@deepseek-ai/dsh'
+// WSL 默认用户通常不是 root：全局安装与 systemctl 都要提权。
+// 依次尝试：root 直接执行 → 免密 sudo（-H 用 root 家目录，避开用户缓存目录属主问题）→ 明确报错交还用户。
+const AS_ROOT = (cmd) => `if [ "$(id -u)" = "0" ]; then ${cmd}; elif sudo -n true 2>/dev/null; then sudo -H ${cmd}; else echo "__DSH_NEED_ROOT__"; exit 13; fi 2>&1`
 const DSH_CHECK_TIMEOUT_MS = 15_000
 const DSH_INSTALL_TIMEOUT_MS = 300_000
 const DSH_RESTART_TIMEOUT_MS = 60_000
@@ -223,12 +232,15 @@ async function performDshUpdate(port, targetVersion) {
   showUpdateSplash(steps[0])
   setUpdateProgress(2)
 
-  // 1) npm 全局更新（--no-fund/--no-audit 减少网络依赖与耗时）
+  // 1) npm 全局更新（--no-fund/--no-audit 减少网络依赖与耗时；自动提权）
   const install = await wslExec(
-    `npm install -g ${DSH_NPM_PACKAGE}@latest --no-fund --no-audit 2>&1`,
+    AS_ROOT(`npm install -g ${DSH_NPM_PACKAGE}@latest --no-fund --no-audit`),
     DSH_INSTALL_TIMEOUT_MS
   )
   if (!install) throw new Error('无法调用 wsl.exe，请确认 Windows 已安装 WSL')
+  if (install.stdout.includes('__DSH_NEED_ROOT__') || install.code === 13) {
+    throw new Error(`当前 WSL 默认用户（非 root）没有免密 sudo，无法自动全局安装。\n请在 WSL 终端手动执行一次后重试：\n  sudo npm install -g ${DSH_NPM_PACKAGE}@latest\n（或为该用户配置 sudo NOPASSWD）`)
+  }
   if (install.code !== 0) {
     throw new Error(`npm 安装失败（exit ${install.code}）：\n${(install.stderr || install.stdout || '').split('\n').slice(-6).join('\n')}`)
   }
@@ -243,10 +255,13 @@ async function performDshUpdate(port, targetVersion) {
 
   // 3) 重启 systemd 服务；无 systemd 时降级为提示
   showUpdateSplash(steps[2])
-  const restart = await wslExec('systemctl restart dsh 2>&1', DSH_RESTART_TIMEOUT_MS)
+  const restart = await wslExec(AS_ROOT('systemctl restart dsh'), DSH_RESTART_TIMEOUT_MS)
   let restartManual = false
   if (!restart || restart.code !== 0) {
     const msg = restart ? (restart.stderr || restart.stdout || '') : ''
+    if (restart && (restart.stdout.includes('__DSH_NEED_ROOT__') || restart.code === 13)) {
+      throw new Error('重启服务需要 root：当前 WSL 默认用户没有免密 sudo。\n请在 WSL 终端手动执行：sudo systemctl restart dsh')
+    }
     if (/systemd|System has not been booted/i.test(msg)) {
       restartManual = true
       log('dsh update: systemd unavailable, asking user to restart manually')
@@ -265,7 +280,7 @@ async function performDshUpdate(port, targetVersion) {
   }
   setUpdateProgress(-1)
   if (back) {
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.reload()
+    loadApp()
   } else {
     log('dsh update: service did not come back within timeout')
   }
@@ -339,7 +354,7 @@ async function checkDshUpdate(silent = false) {
         detail: `${String(e && e.message || e)}\n\n也可在 WSL 中手动执行：\n  npm install -g ${DSH_NPM_PACKAGE}@latest\n  systemctl restart dsh`,
         buttons: ['好'], noLink: true,
       })
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.reload()
+      loadApp()
     }
   }
 }
@@ -418,6 +433,7 @@ function deleteSession(id) {
  * ------------------------------------------------------------------ */
 
 function createWindow(url) {
+  appURL = url
   mainWindow = new BrowserWindow({
     width: 1280, height: 840, minWidth: 960, minHeight: 600,
     title: 'DeepSeek Harness',
@@ -436,7 +452,7 @@ function createWindow(url) {
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.type === 'keyDown' && input.key === 'F5') {
       event.preventDefault()
-      mainWindow.webContents.reload()
+      loadApp()
     }
   })
 
@@ -595,7 +611,7 @@ function createApplicationMenu() {
     {
       label: '视图',
       submenu: [
-        { label: '重新加载', accelerator: 'CmdOrCtrl+R', click: () => { if (mainWindow) mainWindow.webContents.reload() } },
+        { label: '重新加载', accelerator: 'CmdOrCtrl+R', click: () => loadApp() },
         { label: '强制重新加载（清缓存）', accelerator: 'CmdOrCtrl+Shift+R', click: () => { if (mainWindow) mainWindow.webContents.reloadIgnoringCache() } },
         { type: 'separator' },
         { role: 'togglefullscreen', label: '全屏' },
@@ -649,7 +665,7 @@ if (!gotLock) {
     setTimeout(() => checkDshUpdate(true).catch((e) => log('dsh update check error:', e && e.message)), 3_000)
 
     // 悬浮刷新按钮
-    ipcMain.on('dsh-desktop:reload', () => { if (mainWindow) mainWindow.webContents.reload() })
+    ipcMain.on('dsh-desktop:reload', () => loadApp())
 
     // 选区截图
     ipcMain.handle('dsh-desktop:capture', async () => {

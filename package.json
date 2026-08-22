@@ -1,7 +1,7 @@
 {
   "name": "dsh-desktop-wsl",
   "productName": "DeepSeek Harness (WSL)",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "WSL 适配版：Windows 桌面客户端，连接 WSL 中已有的 DeepSeek Harness Web UI。支持主动更新 WSL 内 DSH、选区截图提问、系统托盘、会话管理。",
   "main": "src/main.js",
   "license": "MIT",
